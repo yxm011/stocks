@@ -5,7 +5,7 @@
 
 export const config = {
   title: 'Market Heatmap',
-  refreshInterval: 5000, // ms between live-data ticks
+  refreshInterval: 30000, // ms between API refreshes (30s to respect rate limits)
 
   // Which quadrants to show and in what order.
   // Options: 'stocks' | 'metals' | 'exchanges' | 'watchlist'
