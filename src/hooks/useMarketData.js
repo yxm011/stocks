@@ -10,17 +10,34 @@ const METALS_SPOT_API = 'https://api.gold-api.com/price';
 
 // --- Refresh intervals ---
 const METALS_INTERVAL = 1000;  // 1 second — lightweight single-field JSON
-const STOCKS_INTERVAL = 10000; // 10 seconds — Yahoo Finance
+const COMMODITIES_INTERVAL = 10000; // 10 seconds — Yahoo Finance
 const CRYPTO_INTERVAL = 15000; // 15 seconds — CoinGecko rate limit
 const FOREX_INTERVAL = 60000;  // 60 seconds — exchangerate-api daily rates
 
 // --- Ticker definitions ---
-const STOCK_SECTORS = [
-  { name: 'Technology', tickers: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'AVGO'] },
-  { name: 'Finance', tickers: ['BRK-B', 'JPM', 'V', 'MA', 'BAC'] },
-  { name: 'Healthcare', tickers: ['LLY', 'JNJ', 'UNH', 'PFE'] },
-  { name: 'Energy', tickers: ['XOM', 'CVX', 'COP'] },
-  { name: 'Consumer', tickers: ['WMT', 'PG', 'KO', 'COST'] },
+const COMMODITY_SECTORS = [
+  {
+    name: 'Energy',
+    commodities: [
+      { yahoo: 'BZ=F', symbol: 'BRENT', name: 'Brent Crude', unit: 'USD/bbl' },
+      { yahoo: 'CL=F', symbol: 'WTI', name: 'WTI Crude', unit: 'USD/bbl' },
+      { yahoo: 'NG=F', symbol: 'NATGAS', name: 'Natural Gas', unit: 'USD/MMBtu' },
+      { yahoo: 'HO=F', symbol: 'HEATING', name: 'Heating Oil', unit: 'USD/gal' },
+      { yahoo: 'RB=F', symbol: 'GASOLINE', name: 'Gasoline', unit: 'USD/gal' },
+    ],
+  },
+  {
+    name: 'Agriculture',
+    commodities: [
+      { yahoo: 'ZW=F', symbol: 'WHEAT', name: 'Wheat', unit: 'USc/bu' },
+      { yahoo: 'ZC=F', symbol: 'CORN', name: 'Corn', unit: 'USc/bu' },
+      { yahoo: 'ZS=F', symbol: 'SOYBEAN', name: 'Soybeans', unit: 'USc/bu' },
+      { yahoo: 'KC=F', symbol: 'COFFEE', name: 'Coffee', unit: 'USc/lb' },
+      { yahoo: 'SB=F', symbol: 'SUGAR', name: 'Sugar', unit: 'USc/lb' },
+      { yahoo: 'CT=F', symbol: 'COTTON', name: 'Cotton', unit: 'USc/lb' },
+      { yahoo: 'CC=F', symbol: 'COCOA', name: 'Cocoa', unit: 'USD/t' },
+    ],
+  },
 ];
 
 const METAL_SYMBOLS = [
@@ -92,7 +109,7 @@ async function fetchMetalsSpot() {
 // --- Main hook ---
 export function useMarketData() {
   const [data, setData] = useState({
-    stocks: [],
+    commodities: [],
     metals: [],
     exchanges: [],
     forex: [],
@@ -146,33 +163,32 @@ export function useMarketData() {
     }
   }, []);
 
-  // --- STOCKS + INDICES: fetches every 10 seconds ---
-  const fetchStocks = useCallback(async () => {
+  // --- COMMODITIES + INDICES: fetches every 10 seconds ---
+  const fetchCommodities = useCallback(async () => {
     try {
       const allYahooSymbols = [
-        ...STOCK_SECTORS.flatMap((s) => s.tickers),
+        ...COMMODITY_SECTORS.flatMap((s) => s.commodities.map((c) => c.yahoo)),
         ...INDEX_SYMBOLS.map((idx) => idx.yahoo),
-        'CL=F',
       ];
       const yahooMap = await fetchYahooBatch(allYahooSymbols);
       yahooMapRef.current = { ...yahooMapRef.current, ...yahooMap };
 
-      const stocks = STOCK_SECTORS.map((sector) => {
-        const sectorStocks = sector.tickers.map((ticker) => {
-          const q = yahooMap[ticker];
+      const commodities = COMMODITY_SECTORS.map((sector) => {
+        const items = sector.commodities.map((c) => {
+          const q = yahooMap[c.yahoo];
           return {
-            ticker: ticker.replace('-', '.'),
-            name: ticker.replace('-', '.'),
+            symbol: c.symbol,
+            name: c.name,
+            unit: c.unit,
             price: q?.price ?? 0,
             change: q?.change ?? 0,
-            marketCap: q?.price ? q.price * 10 : 100,
           };
         });
-        const validStocks = sectorStocks.filter((s) => s.price > 0);
-        const avgChange = validStocks.length
-          ? validStocks.reduce((s, st) => s + st.change, 0) / validStocks.length
+        const valid = items.filter((c) => c.price > 0);
+        const avgChange = valid.length
+          ? valid.reduce((s, c) => s + c.change, 0) / valid.length
           : 0;
-        return { name: sector.name, change: avgChange, stocks: sectorStocks };
+        return { name: sector.name, change: avgChange, commodities: items };
       });
 
       const exchanges = INDEX_SYMBOLS.map((idx) => {
@@ -186,22 +202,23 @@ export function useMarketData() {
         };
       });
 
-      const oilData = yahooMap['CL=F'];
+      // Find Brent and WTI for watchlist
+      const brent = yahooMap['BZ=F'];
+      const wti = yahooMap['CL=F'];
 
       setData((prev) => ({
         ...prev,
-        stocks,
+        commodities,
         exchanges,
         loading: false,
         watchlist: prev.watchlist.map((w) => {
-          if (w.symbol === 'OIL' && oilData) return { ...w, price: oilData.price, change: oilData.change };
-          const stockMatch = stocks.flatMap((s) => s.stocks).find((st) => st.ticker === w.symbol);
-          if (stockMatch && w.type === 'stock') return { ...w, price: stockMatch.price, change: stockMatch.change };
+          if (w.symbol === 'BRENT' && brent) return { ...w, price: brent.price, change: brent.change };
+          if (w.symbol === 'WTI' && wti) return { ...w, price: wti.price, change: wti.change };
           return w;
         }),
       }));
     } catch (err) {
-      console.warn('Stocks fetch error:', err.message);
+      console.warn('Commodities fetch error:', err.message);
     }
   }, []);
 
@@ -280,11 +297,12 @@ export function useMarketData() {
 
   // --- Bootstrap: initial load of everything ---
   const bootstrap = useCallback(async () => {
-    await Promise.all([fetchMetals(), fetchStocks(), fetchCrypto(), fetchForex()]);
+    await Promise.all([fetchMetals(), fetchCommodities(), fetchCrypto(), fetchForex()]);
 
     // Build initial watchlist
     setData((prev) => {
-      const oilData = yahooMapRef.current['CL=F'];
+      const brent = yahooMapRef.current['BZ=F'];
+      const wti = yahooMapRef.current['CL=F'];
       const goldItem = prev.metals.find((m) => m.symbol === 'GOLD');
       const watchlistBase = prev.watchlist.length
         ? prev.watchlist
@@ -297,31 +315,29 @@ export function useMarketData() {
               change: c.price_change_percentage_24h ?? 0,
             }))),
             { symbol: 'GOLD', name: 'Gold', type: 'commodity', price: goldItem?.price || 0, change: goldItem?.change || 0 },
-            { symbol: 'OIL', name: 'Crude Oil', type: 'commodity', price: oilData?.price || 0, change: oilData?.change || 0 },
-            ...(prev.stocks[0]?.stocks?.slice(0, 2).filter((s) => s.price > 0).map((s) => ({
-              symbol: s.ticker, name: s.name, type: 'stock', price: s.price, change: s.change,
-            })) || []),
+            { symbol: 'BRENT', name: 'Brent Crude', type: 'commodity', price: brent?.price || 0, change: brent?.change || 0 },
+            { symbol: 'WTI', name: 'WTI Crude', type: 'commodity', price: wti?.price || 0, change: wti?.change || 0 },
           ];
       return { ...prev, watchlist: watchlistBase.filter((w) => w.price > 0), loading: false };
     });
-  }, [fetchMetals, fetchStocks, fetchCrypto, fetchForex]);
+  }, [fetchMetals, fetchCommodities, fetchCrypto, fetchForex]);
 
   // --- Setup intervals ---
   useEffect(() => {
     bootstrap();
 
     const metalsId = setInterval(fetchMetals, METALS_INTERVAL);
-    const stocksId = setInterval(fetchStocks, STOCKS_INTERVAL);
+    const commoditiesId = setInterval(fetchCommodities, COMMODITIES_INTERVAL);
     const cryptoId = setInterval(fetchCrypto, CRYPTO_INTERVAL);
     const forexId = setInterval(fetchForex, FOREX_INTERVAL);
 
     return () => {
       clearInterval(metalsId);
-      clearInterval(stocksId);
+      clearInterval(commoditiesId);
       clearInterval(cryptoId);
       clearInterval(forexId);
     };
-  }, [bootstrap, fetchMetals, fetchStocks, fetchCrypto, fetchForex]);
+  }, [bootstrap, fetchMetals, fetchCommodities, fetchCrypto, fetchForex]);
 
   return data;
 }

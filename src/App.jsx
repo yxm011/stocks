@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useMarketData } from './hooks/useMarketData';
 import { useClock } from './hooks/useClock';
 import config from './config/dashboard';
-import StockHeatmap from './components/StockHeatmap';
+import CommoditiesHeatmap from './components/CommoditiesHeatmap';
 import GoldHeatmap from './components/GoldHeatmap';
 import ExchangeHeatmap from './components/ExchangeHeatmap';
 import CombinedWatchlist from './components/CombinedWatchlist';
 
 const QUADRANT_MAP = {
-  stocks: (data) => <StockHeatmap sectors={data.stocks} />,
+  commodities: (data) => <CommoditiesHeatmap sectors={data.commodities} />,
   metals: (data) => <GoldHeatmap metals={data.metals} />,
   exchanges: (data) => (
     <ExchangeHeatmap
@@ -89,6 +89,7 @@ function TickerStrip({ data }) {
   const items = [
     ...(data.watchlist || []).map((w) => ({ label: w.symbol, change: w.change })),
     ...(data.metals || []).map((m) => ({ label: m.symbol, change: m.change })),
+    ...(data.commodities || []).flatMap((s) => s.commodities.map((c) => ({ label: c.symbol, change: c.change }))),
   ];
 
   return (

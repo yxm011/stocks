@@ -8,8 +8,8 @@ export const config = {
   refreshInterval: 30000, // ms between API refreshes (30s to respect rate limits)
 
   // Which quadrants to show and in what order.
-  // Options: 'stocks' | 'metals' | 'exchanges' | 'watchlist'
-  quadrants: ['stocks', 'metals', 'exchanges', 'watchlist'],
+  // Options: 'commodities' | 'metals' | 'exchanges' | 'watchlist'
+  quadrants: ['commodities', 'metals', 'exchanges', 'watchlist'],
 
   // TV frame dimensions (CSS pixels, scaled to fit viewport)
   frame: { width: 1920, height: 1080 },
